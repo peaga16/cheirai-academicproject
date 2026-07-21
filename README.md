@@ -1,81 +1,98 @@
-# Cheiraí — projeto corrigido
+# Cheiraí
 
-Aplicação web para controlar a validade de alimentos após a abertura, com dashboard, produtos, histórico, configurações de alertas e família compartilhada.
+Cheiraí é uma aplicação web para controlar a validade de alimentos após a abertura. Permite registrar produtos, acompanhar prazos de validade, visualizar um painel (dashboard) com estatísticas e manter um histórico de ações (consumido, descartado).
 
-## O que foi corrigido
+Principais funcionalidades
+- Dashboard com estatísticas de produtos (OK, Atenção, Vencidos)
+- Cadastro, edição e exclusão de produtos
+- Criação de produtos via leitura de código de barras (scanner)
+- Histórico de ações (consumo/descartes) e estatísticas de desperdício
+- Autenticação de usuários e rotas protegidas
 
-- Removida a estrutura duplicada que fazia existir um projeto incompleto na raiz e outro dentro de `cheirai-novo/`.
-- Criado um único frontend em React + Vite.
-- Corrigida a autenticação para usar um `AuthContext` compartilhado. Antes, cada página criava um estado de login independente.
-- Adicionado layout protegido com navegação permanente entre **Dashboard**, **Produtos**, **Histórico** e **Configurações**.
-- Adicionadas rotas de API que faltavam para categorias, locais, filtros, edição, exclusão, duplicação, resumo do dashboard, histórico, exportação CSV, notificações e família.
-- Padronizados todos os nomes de campos para o modelo SQL fornecido (`id_usuario`, `id_produto`, `nome_produto`, `nome_categoria`, `nome_local` etc.).
-- Corrigida a regra de histórico: o produto não é apagado depois de consumido/descartado; ele deixa de ser ativo por possuir um registro no histórico. Assim, o histórico não desaparece por causa da chave estrangeira.
-- Aplicadas as regras de data de abertura, prazo entre 1 e 365 dias e bloqueio de consumo de produto vencido.
-- Incluído banco de dados revisado em `database/cheirai_modelo_er.sql`.
+Tecnologias
+- Frontend: React + Vite
+- Backend: Node.js + Express
+- Banco de dados: MySQL
+- Barcode: QuaggaJS (`@ericblade/quagga2`)
 
-## Requisitos
-
-- Node.js 18 ou superior
-- MySQL 8.0 ou superior
+Pré-requisitos
+- Node.js 18+ (ou versão compatível)
 - npm
+- MySQL 8+
 
-## 1. Banco de dados
+Instalação (rápida)
 
-Abra o MySQL Workbench e execute:
+1) Banco de dados
 
-```text
-database/cheirai_modelo_er.sql
+Importe o esquema SQL em um banco MySQL (por exemplo no MySQL Workbench):
+
+```sql
+-- arquivo disponível em /database
+SOURCE database/cheirai_modelo_er.sql;
 ```
 
-Para a atualização automática diária dos status, habilite o agendador do MySQL com um usuário administrativo:
+Se quiser comparar com o esquema original, há um arquivo em `database/modelo_original_fornecido.sql`.
+
+Ative o agendador do MySQL se desejar tarefas agendadas (opcional):
 
 ```sql
 SET GLOBAL event_scheduler = ON;
 ```
 
-Mesmo sem o agendador, a API recalcula o status nas consultas.
-
-## 2. Backend
+2) Backend
 
 ```bash
 cd backend
 cp .env.example .env
-```
-
-Edite `.env` com os dados do seu MySQL e execute:
-
-```bash
+# Edite .env com as credenciais do seu banco
 npm install
 npm run dev
 ```
 
-API: `http://localhost:5000`
+Por padrão a API roda em: `http://localhost:5000` (endereço configurável em `.env`).
 
-## 3. Frontend
-
-Em outro terminal:
+3) Frontend
 
 ```bash
 cd frontend
 cp .env.example .env
+# Edite .env caso queira alterar a URL da API
 npm install
 npm run dev
 ```
 
-Aplicação: `http://localhost:5173`
+A aplicação frontend estará disponível em `http://localhost:5173`.
 
-## Páginas disponíveis
+Uso básico
+- Crie uma conta ou faça login.
+- Acesse o painel em `/dashboard` para visualizar estatísticas.
+- Cadastre produtos em `/produtos` ou use `/criar-produto` para adicionar rapidamente com leitura de código de barras.
+- Consulte ações antigas em `/historico`.
 
-- `/dashboard`
-- `/produtos`
-- `/historico`
-- `/configuracoes`
+Configurações e variáveis de ambiente
+- Backend: copie `backend/.env.example` para `backend/.env` e ajuste `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `PORT`, etc.
+- Frontend: copie `frontend/.env.example` para `frontend/.env` caso queira sobrescrever a `VITE_API_BASE_URL`.
 
-As páginas são protegidas por login. A navegação aparece no menu lateral no desktop e no menu móvel em telas menores.
+Dicas de desenvolvimento
+- Se o frontend reclamar de imports (ex.: erro ao resolver `./styles/GlobalStyles.css`), verifique caminhos relativos em `src/main.jsx` (`../styles/GlobalStyles.css`).
+- Tokens de autenticação são guardados no `localStorage` em desenvolvimento; limpar `localStorage` pode resolver problemas de login.
 
-## Observações
+Estrutura do projeto (resumida)
 
-- Login social Google/Apple, notificações push reais, leitura de código de barras pela câmera e sincronização offline exigem configuração de serviços externos e não são simulados como se estivessem prontos.
-- A exportação PDF do histórico usa a caixa de impressão do navegador; escolha **Salvar como PDF**.
-- O modelo SQL original fornecido também foi preservado em `database/modelo_original_fornecido.sql` para comparação.
+- backend/ — API Express, rotas e serviços
+- frontend/ — app React com Vite
+- database/ — arquivos SQL (modelo e original)
+- docs/ — documentação adicional
+
+Contribuição
+- Fork, crie uma branch com a sua feature/fix (`feature/nome`) e envie um pull request descrevendo as mudanças.
+
+Suporte
+- Abra uma issue descrevendo o bug ou a sugestão, incluindo passos para reproduzir e logs relevantes.
+
+Licença
+- (Adicione aqui a licença do projeto, ex.: MIT) 
+
+---
+
+Obrigado por usar o Cheiraí! Se quiser que eu adicione instruções de deploy (Docker, PM2, etc.), diga qual método prefere e eu adiciono exemplos.
