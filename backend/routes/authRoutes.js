@@ -1,27 +1,31 @@
 import express from 'express'
-import { registrarUsuario, loginUsuario } from '../services/authService.js'
+import { login, obterPerfil, registrar } from '../services/authService.js'
+import { verificarToken } from '../middleware/auth.js'
+import { enviarErro } from '../utils/http.js'
 
 const router = express.Router()
 
 router.post('/registrar', async (req, res) => {
   try {
-    console.log('Recebido:', req.body)
-    const resultado = await registrarUsuario(req.body.nome, req.body.email, req.body.senha)
-    res.status(201).json(resultado)
+    return res.status(201).json(await registrar(req.body))
   } catch (error) {
-    console.error('Erro ao registrar:', error)
-    res.status(400).json({ sucesso: false, mensagem: error.message })
+    return enviarErro(res, error)
   }
 })
 
 router.post('/login', async (req, res) => {
   try {
-    console.log('Recebido:', req.body)
-    const resultado = await loginUsuario(req.body.email, req.body.senha)
-    res.status(200).json(resultado)
+    return res.json(await login(req.body))
   } catch (error) {
-    console.error('Erro ao login:', error)
-    res.status(401).json({ sucesso: false, mensagem: error.message })
+    return enviarErro(res, error)
+  }
+})
+
+router.get('/perfil', verificarToken, async (req, res) => {
+  try {
+    return res.json(await obterPerfil(req.usuario.id_usuario))
+  } catch (error) {
+    return enviarErro(res, error)
   }
 })
 

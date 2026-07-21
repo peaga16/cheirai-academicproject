@@ -1,17 +1,17 @@
-import jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken'
 
-export const verifyToken = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ sucesso: false });
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.usuario = decoded;
-    next();
-  } catch (e) {
-    res.status(403).json({ sucesso: false });
+export function verificarToken(req, res, next) {
+  const authorization = req.headers.authorization || ''
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : null
+
+  if (!token) {
+    return res.status(401).json({ sucesso: false, mensagem: 'Faça login para continuar.' })
   }
-};
 
-export const generateToken = (id, email) => {
-  return jwt.sign({ id, email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-};
+  try {
+    req.usuario = jwt.verify(token, process.env.JWT_SECRET || 'chave-local-cheirai')
+    return next()
+  } catch {
+    return res.status(401).json({ sucesso: false, mensagem: 'Sessão inválida ou expirada.' })
+  }
+}

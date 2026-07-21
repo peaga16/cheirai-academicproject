@@ -1,68 +1,69 @@
-import { useState, useEffect } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import api from '../services/api'
-import '../styles/Historico.css'
+import { Download, FileText, Filter, Printer } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import EmptyState from '../components/EmptyState'
+import api, { mensagemErro } from '../services/api'
+
+const formatarDataHora = (data) => new Date(data.replace(' ', 'T')).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
 export default function Historico() {
   const [historico, setHistorico] = useState([])
   const [stats, setStats] = useState(null)
-  const [filtroTipo, setFiltroTipo] = useState('')
+  const [filtros, setFiltros] = useState({ tipo: '', mes: '' })
   const [carregando, setCarregando] = useState(true)
-  const { logout } = useAuth()
+  const [erro, setErro] = useState('')
 
-  useEffect(() => {
-    carregarDados()
-  }, [filtroTipo])
-
-  const carregarDados = async () => {
+  const carregar = useCallback(async () => {
+    setCarregando(true)
+    setErro('')
     try {
-      const [histRes, statsRes] = await Promise.all([
-        api.get('/historico', { params: { tipo: filtroTipo || undefined } }),
-        api.get('/historico/estatisticas/desperdicio')
+      const params = Object.fromEntries(Object.entries(filtros).filter(([, value]) => value))
+      const [listaRes, statsRes] = await Promise.all([
+        api.get('/historico', { params }),
+        api.get('/historico/estatisticas')
       ])
-      setHistorico(histRes.data.dados || [])
+      setHistorico(listaRes.data.dados || [])
       setStats(statsRes.data.dados)
-    } catch (error) {
-      console.error('Erro:', error)
-    } finally {
-      setCarregando(false)
-    }
+    } catch (error) { setErro(mensagemErro(error)) }
+    finally { setCarregando(false) }
+  }, [filtros])
+
+  useEffect(() => { carregar() }, [carregar])
+
+  const exportarCsv = async () => {
+    try {
+      const response = await api.get('/historico/exportar.csv', { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'historico-cheirai.csv'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) { setErro(mensagemErro(error, 'Não foi possível exportar o histórico.')) }
   }
 
   return (
-    <div style={{ padding: '20px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h1>📋 Histórico</h1>
-        <button onClick={logout}>Sair</button>
-      </header>
-      {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '20px' }}>
-          <div style={{ background: '#f0f0f0', padding: '15px', borderRadius: '5px' }}><h3>Total</h3><p style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.total_acoes}</p></div>
-          <div style={{ background: '#e8f5e9', padding: '15px', borderRadius: '5px' }}><h3>Consumidos</h3><p style={{ fontSize: '24px', fontWeight: 'bold', color: '#4CAF50' }}>{stats.consumido}</p></div>
-          <div style={{ background: '#ffebee', padding: '15px', borderRadius: '5px' }}><h3>Descartados</h3><p style={{ fontSize: '24px', fontWeight: 'bold', color: '#F44336' }}>{stats.descartado}</p></div>
-          <div style={{ background: '#fff3e0', padding: '15px', borderRadius: '5px' }}><h3>Desperdício</h3><p style={{ fontSize: '24px', fontWeight: 'bold', color: '#FF9800' }}>{stats.total_acoes > 0 ? ((stats.desperdicio / stats.total_acoes) * 100).toFixed(1) : 0}%</p></div>
-        </div>
-      )}
-      <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} style={{ marginBottom: '20px' }}>
-        <option value="">Todas as Ações</option>
-        <option value="consumido">Consumidos</option>
-        <option value="descartado">Descartados</option>
-      </select>
-      {carregando ? <div>Carregando...</div> : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: '#f0f0f0' }}><th style={{ padding: '10px', textAlign: 'left' }}>Produto</th><th>Ação</th><th>Status</th><th>Data</th></tr></thead>
-          <tbody>
-            {historico.map(h => (
-              <tr key={h.id} style={{ borderBottom: '1px solid #ddd' }}>
-                <td style={{ padding: '10px' }}>{h.produto || 'Deletado'}</td>
-                <td>{h.tipo === 'consumido' ? '✅ Consumido' : '❌ Descartado'}</td>
-                <td>{h.estava_vencido ? '🔴 Vencido' : '✅ OK'}</td>
-                <td>{new Date(h.data_acao).toLocaleDateString('pt-BR')}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+    <div className="page-stack history-page">
+      <div className="page-heading"><div><span className="eyebrow">Consumo e descarte</span><h2>Histórico de ações</h2><p>Acompanhe o uso dos produtos e sua taxa de desperdício.</p></div><div className="heading-actions"><button className="button secondary" onClick={() => window.print()}><Printer size={18} /> Salvar em PDF</button><button className="button primary" onClick={exportarCsv}><Download size={18} /> Exportar CSV</button></div></div>
+      {erro && <div className="alert error">{erro}</div>}
+
+      <section className="stats-grid history-stats">
+        <article className="stat-card"><div className="stat-icon neutral"><FileText /></div><div><span>Total de ações</span><strong>{stats?.total_acoes || 0}</strong></div></article>
+        <article className="stat-card"><div className="stat-icon success">✓</div><div><span>Consumidos</span><strong>{stats?.consumidos || 0}</strong></div></article>
+        <article className="stat-card"><div className="stat-icon warning">↗</div><div><span>Descartados</span><strong>{stats?.descartados || 0}</strong></div></article>
+        <article className="stat-card"><div className="stat-icon danger">%</div><div><span>Taxa de desperdício</span><strong>{stats?.taxa_desperdicio || 0}%</strong></div></article>
+      </section>
+
+      <section className="filters-panel history-filters">
+        <div className="filter-label"><Filter size={18} /><strong>Filtros</strong></div>
+        <select value={filtros.tipo} onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })}><option value="">Todas as ações</option><option value="consumido">Consumidos</option><option value="descartado">Descartados</option></select>
+        <input type="month" value={filtros.mes} onChange={(e) => setFiltros({ ...filtros, mes: e.target.value })} />
+      </section>
+
+      <section className="panel table-panel">
+        {carregando ? <div className="table-loading">Carregando histórico…</div> : historico.length ? (
+          <div className="table-wrap"><table><thead><tr><th>Produto</th><th>Categoria / local</th><th>Ação</th><th>Condição</th><th>Data</th></tr></thead><tbody>{historico.map((item) => <tr key={item.id_historico}><td><strong>{item.nome_produto}</strong></td><td><span className="muted">{item.nome_categoria || '—'} · {item.nome_local || '—'}</span></td><td><span className={`status-badge ${item.tipo === 'consumido' ? 'success' : 'warning'}`}>{item.tipo === 'consumido' ? 'Consumido' : 'Descartado'}</span></td><td>{item.estava_vencido ? <span className="status-badge danger">Estava vencido</span> : <span className="status-badge neutral">Dentro do prazo</span>}</td><td>{formatarDataHora(item.data_acao)}</td></tr>)}</tbody></table></div>
+        ) : <EmptyState icon="📋" title="Nenhuma ação encontrada" description="Produtos consumidos ou descartados aparecerão aqui." />}
+      </section>
     </div>
   )
 }

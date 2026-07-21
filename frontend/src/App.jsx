@@ -1,24 +1,33 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import AppLayout from './components/AppLayout'
+import LoadingScreen from './components/LoadingScreen'
+import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './hooks/useAuth'
-import Login from './pages/Login'
-import Registrar from './pages/Registrar'
+import Configuracoes from './pages/Configuracoes'
 import Dashboard from './pages/Dashboard'
-import Produtos from './pages/Produtos'
 import Historico from './pages/Historico'
+import Login from './pages/Login'
+import Produtos from './pages/Produtos'
+import Registrar from './pages/Registrar'
 
-function App() {
-  const { usuario } = useAuth()
+export default function App() {
+  const { carregando, autenticado } = useAuth()
+  if (carregando) return <LoadingScreen />
 
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/registrar" element={<Registrar />} />
-      <Route path="/dashboard" element={usuario ? <Dashboard /> : <Navigate to="/login" />} />
-      <Route path="/produtos" element={usuario ? <Produtos /> : <Navigate to="/login" />} />
-      <Route path="/historico" element={usuario ? <Historico /> : <Navigate to="/login" />} />
-      <Route path="/" element={usuario ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/produtos" element={<Produtos />} />
+          <Route path="/historico" element={<Historico />} />
+          <Route path="/configuracoes" element={<Configuracoes />} />
+        </Route>
+      </Route>
+      <Route path="/" element={<Navigate to={autenticado ? '/dashboard' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={autenticado ? '/dashboard' : '/login'} replace />} />
     </Routes>
   )
 }
-
-export default App

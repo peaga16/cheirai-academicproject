@@ -1,70 +1,84 @@
-import pool from '../config/database.js'
 import bcrypt from 'bcryptjs'
-import { generateToken } from '../middleware/auth.js'
+import jwt from 'jsonwebtoken'
+import pool from '../config/database.js'
+import { erroHttp } from '../utils/http.js'
 
-export const registrarUsuario = async (nome, email, senha) => {
-  const conn = await pool.getConnection()
-  try {
-    const [users] = await conn.query('SELECT id FROM usuario WHERE email = ?', [email])
-    if (users.length) throw new Error('Email já existe')
-    
-    const hash = await bcrypt.hash(senha, 10)
-    const [res] = await conn.query('INSERT INTO usuario (nome, email, senha) VALUES (?, ?, ?)', [nome, email, hash])
-    
-    const token = generateToken(res.insertId, email)
-    return { 
-      sucesso: true, 
-      dados: { 
-        id: res.insertId, 
-        nome, 
-        email, 
-        token 
-      } 
-    }
-  } finally { 
-    conn.release() 
+function gerarToken(usuario) {
+  return jwt.sign(
+    { id_usuario: usuario.id_usuario, email: usuario.email },
+    process.env.JWT_SECRET || 'chave-local-cheirai',
+    { expiresIn: '7d' }
+  )
+}
+
+function usuarioPublico(usuario) {
+  return {
+    id_usuario: usuario.id_usuario,
+    id_familia: usuario.id_familia,
+    nome: usuario.nome,
+    email: usuario.email,
+    idioma: usuario.idioma,
+    tema: usuario.tema
   }
 }
 
-export const loginUsuario = async (email, senha) => {
-  const conn = await pool.getConnection()
-  try {
-    const [users] = await conn.query('SELECT id, nome, email, senha FROM usuario WHERE email = ?', [email])
-    if (!users.length) throw new Error('Credenciais inválidas')
-    
-    const usuario = users[0]
-    const ok = await bcrypt.compare(senha, usuario.senha)
-    if (!ok) throw new Error('Credenciais inválidas')
-    
-    const token = generateToken(usuario.id, usuario.email)
-    return { 
-      sucesso: true, 
-      dados: { 
-        id: usuario.id, 
-        nome: usuario.nome, 
-        email: usuario.email, 
-        token 
-      } 
-    }
-  } finally { 
-    conn.release() 
+export async function registrar({ nome, email, senha }) {
+  const nomeLimpo = nome?.trim()
+  const emailLimpo = email?.trim().toLowerCase()
+
+  if (!nomeLimpo || !emailLimpo || !senha) throw erroHttp(400, 'Preencha nome, e-mail e senha.')
+  if (senha.length < 6) throw erroHttp(400, 'A senha deve ter pelo menos 6 caracteres.')
+
+  const [existentes] = await pool.query('SELECT id_usuario FROM usuario WHERE email = ?', [emailLimpo])
+  if (existentes.length) throw erroHttp(409, 'Este e-mail já está cadastrado.')
+
+  const senhaHash = await bcrypt.hash(senha, 10)
+  const [resultado] = await pool.query(
+    `INSERT INTO usuario (nome, email, senha, idioma, tema)
+     VALUES (?, ?, ?, 'pt', 'automatico')`,
+    [nomeLimpo, emailLimpo, senhaHash]
+  )
+
+  const usuario = {
+    id_usuario: resultado.insertId,
+    id_familia: null,
+    nome: nomeLimpo,
+    email: emailLimpo,
+    idioma: 'pt',
+    tema: 'automatico'
+  }
+
+  return { sucesso: true, token: gerarToken(usuario), usuario }
+}
+
+export async function login({ email, senha }) {
+  const emailLimpo = email?.trim().toLowerCase()
+  if (!emailLimpo || !senha) throw erroHttp(400, 'Informe e-mail e senha.')
+
+  const [usuarios] = await pool.query(
+    `SELECT id_usuario, id_familia, nome, email, senha, idioma, tema
+     FROM usuario WHERE email = ? LIMIT 1`,
+    [emailLimpo]
+  )
+
+  const usuario = usuarios[0]
+  if (!usuario || !usuario.senha || !(await bcrypt.compare(senha, usuario.senha))) {
+    throw erroHttp(401, 'E-mail ou senha incorretos.')
+  }
+
+  return {
+    sucesso: true,
+    token: gerarToken(usuario),
+    usuario: usuarioPublico(usuario)
   }
 }
 
-export const mudarSenha = async (usuarioId, senhaAtual, novaSenha) => {
-  const conn = await pool.getConnection()
-  try {
-    const [users] = await conn.query('SELECT senha FROM usuario WHERE id = ?', [usuarioId])
-    if (!users.length) throw new Error('Usuário não encontrado')
-    
-    const ok = await bcrypt.compare(senhaAtual, users[0].senha)
-    if (!ok) throw new Error('Senha atual incorreta')
-    
-    const novaHash = await bcrypt.hash(novaSenha, 10)
-    await conn.query('UPDATE usuario SET senha = ? WHERE id = ?', [novaHash, usuarioId])
-    
-    return { sucesso: true, mensagem: 'Senha alterada com sucesso' }
-  } finally { 
-    conn.release() 
-  }
+export async function obterPerfil(idUsuario) {
+  const [usuarios] = await pool.query(
+    `SELECT id_usuario, id_familia, nome, email, idioma, tema
+     FROM usuario WHERE id_usuario = ? LIMIT 1`,
+    [idUsuario]
+  )
+  if (!usuarios.length) throw erroHttp(404, 'Usuário não encontrado.')
+  return { sucesso: true, usuario: usuarios[0] }
 }
