@@ -1,5 +1,7 @@
 # Cheiraí
 
+**Criador:** Pedro Henrique Alves Andrade — 2° ADS 2025.2
+
 Cheiraí é uma aplicação web para controlar a validade de alimentos após a abertura. Permite registrar produtos, acompanhar prazos de validade, visualizar um painel (dashboard) com estatísticas e manter um histórico de ações (consumido, descartado).
 
 Principais funcionalidades
