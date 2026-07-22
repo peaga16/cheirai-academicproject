@@ -92,9 +92,6 @@ Contribuição
 Suporte
 - Abra uma issue descrevendo o bug ou a sugestão, incluindo passos para reproduzir e logs relevantes.
 
-Licença
-- (Adicione aqui a licença do projeto, ex.: MIT) 
+
 
 ---
-
-Obrigado por usar o Cheiraí! Se quiser que eu adicione instruções de deploy (Docker, PM2, etc.), diga qual método prefere e eu adiciono exemplos.
